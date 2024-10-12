@@ -20,16 +20,14 @@ def decrypt(key, enc_message):
     return dec_message
 
 def store(key):
-    url = input("Enter the url (optional): ")
+    url1 = input("Enter the url (optional): ")
     username = input("Enter the username: ")
     password = input("Enter the password: ")
-    field = input("Enter extra info (optional): ")
-
-    if url == "":
-        url = "uu"
-    if field == "":
-        field = "ff"
-
+    field1 = input("Enter extra info (optional): ")
+    
+    url = "uu" if url1 == "" else url1
+    field = "ff" if field1 == "" else field1
+    
     url = encrypt(key, url)
     username = encrypt(key, username)
     password = encrypt(key, password)
