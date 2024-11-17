@@ -1,149 +1,159 @@
 #!/usr/bin/env python3
 
 import base64
+import pickle
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import hashlib
 import os
 from getpass import getpass
+import random
 
-def encrypt(key, message):
+def encrypt(key, text):
     cipher = AES.new(key, AES.MODE_ECB)
-    padded_message = pad(message.encode("utf-8"), AES.block_size)
-    enc = base64.b64encode(cipher.encrypt(padded_message))
-    return enc.decode('utf-8')
+    padded_text = pad(text.encode(), AES.block_size)
+    encryption = base64.b64encode(cipher.encrypt(padded_text))
+    return encryption.decode()
 
-def decrypt(key, enc_message):
+def decrypt(key, encrypted_text):
     cipher = AES.new(key, AES.MODE_ECB)
-    dec = cipher.decrypt(base64.b64decode(enc_message.encode("utf-8")))
-    dec_message = unpad(dec, AES.block_size).decode('utf-8')
-    return dec_message
+    decrypted = cipher.decrypt(base64.b64decode(encrypted_text.encode()))
+    decrypted_text = unpad(decrypted, AES.block_size).decode()
+    return decrypted_text
+
+def create_password():
+    # Creating a more diverse set of characters
+    chars = [chr(i) for i in range(65, 91)] + [chr(i) for i in range(97, 123)] + ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "-", "="] + [str(i) for i in range(10)]
+    password = "".join(random.choices(chars, k=20))
+    print(f"Password created is -> {password}")
+    return password
 
 def store(key):
-    url1 = input("Enter the url (optional): ")
-    username = input("Enter the username: ")
-    password = input("Enter the password: ")
-    field1 = input("Enter extra info (optional): ")
-    
-    url = "uu" if url1 == "" else url1
-    field = "ff" if field1 == "" else field1
-    
-    url = encrypt(key, url)
-    username = encrypt(key, username)
-    password = encrypt(key, password)
-    field = encrypt(key, field)
+    url = input("Enter the URL (optional) -> ") or "uu"
+    username = input("Enter the USERNAME -> ")
+    password = input("Enter the PASSWORD -> ") or create_password()
+    field = input("Enter optional text -> ") or "ff"
 
-    # Writing to file
-    with open("pass.txt", "a") as file:
-        file.write("*" * 100)
-        file.write(f"{url} ")
-        file.write(f"{username} ")
-        file.write(f"{password} ")
-        file.write(f"{field} ")
-        file.write("*" * 100)
-    print("[+] Records Stored")
+    info = [url, username, password, field]
+    for i in range(len(info)):
+        info[i] = encrypt(key, info[i])
+
+    # Store the encrypted data
+    with open("password.bin", "ab") as file:
+        pickle.dump(info, file)
+    print("[+] Record Saved!")
 
 def show(key):
-    with open("pass.txt") as file:
-        file_contents = file.read().split("*" * 100)
-    file_contents = [file for file in file_contents if file != ""]
+    try:
+        with open("password.bin", "rb") as file:
+            while True:
+                try:
+                    info = pickle.load(file)
+                    for i in range(len(info)):
+                        info[i] = decrypt(key, info[i])
 
-    if (len(file_contents) < 1):
-        print("Password Manager Is empty ")
+                    info[0] = " " if info[0] == "uu" else info[0]
+                    print(f"URL => {info[0]}")
+                    print(f"USERNAME => {info[1]}")
+                    print(f"PASSWORD => {info[2]}")
+                    info[3] = " " if info[3] == "ff" else info[3]
+                    print(f"EXTRA INFO => {info[3]}")
+                    print("-" * 40)
+                except EOFError:
+                    break
+    except FileNotFoundError:
+        print("[!] No Passwords were Saved before ")
         exit()
-
-    for file in file_contents:
-        file = file.split()
-        print("*" * 50)
-        url = decrypt(key, file[0])
-        if url != "uu":
-            print(f"Url     : {url}")
-        print(f"Username: {decrypt(key, file[1])}")
-        print(f"Password: {decrypt(key, file[2])}")
-        field = decrypt(key, file[-1])
-        if field != "ff":
-            print(f"Field   : {field}")
-        print("*" * 50)
 
 def delete(key):
-    username , password = input("Enter the Username and password divided by a (~): ").split("~")
-    username = encrypt(key , username)
-    password = encrypt(key , password)
-
-    with open("pass.txt" , "r") as file:
-        file_contents = file.read().split("*" * 100)
-    file_contents = [file for file in file_contents if file != ""]
-
-    for i in range(len(file_contents)):
-        file_contents[i] = file_contents[i].split()
-    
-    for file in file_contents:
-        if username in file and password in file:
-            del file_contents[file_contents.index(file)]
-            print("[+] Record Deleted! ")
-    
-    with open("pass.txt" , "w") as file:
-        file.close()
-    for i in range(len(file_contents)):
-        with open("pass.txt", "a") as file:
-            file.write("*" * 100)
-            file.write(f"{file_contents[i][0]} ")
-            file.write(f"{file_contents[i][1]} ")
-            file.write(f"{file_contents[i][2]} ")
-            file.write(f"{file_contents[i][-1]} ")
-            file.write("*" * 100)
-
-
-def first_time():
-    password = getpass("Enter a Password for Password Manager: ")
-    password2 = getpass("Enter the password again: ")
-    if password != password2:
-        print("Passwords Dont Match. Try again!")
+    try:
+        with open("password.bin", "rb") as file:
+            infos = []
+            while True:
+                try:
+                    infos.append(pickle.load(file))
+                except EOFError:
+                    break
+    except FileNotFoundError:
+        print("[!] No Passwords were Saved before ")
         exit()
-    
+
+    username = input("Enter the username -> ")
+    password = input("Enter the password -> ")
+
+    for i in range(len(infos)):
+        for j in range(len(infos[i])):
+            infos[i][j] = decrypt(key, infos[i][j])
+
+    for i in range(len(infos)):
+        if username in infos[i] and password in infos[i]:
+            print("[*] Record Found")
+            choice = input("Do you want to delete? (y/N) -> ")
+            if choice.lower() != "n":
+                del infos[i]
+                print("[*] Record Deleted")
+            else:
+                print("[*] Record Not Deleted")
+            break
+    else:
+        print("[!] No Record Found!")
+
+    # Write the remaining records back to the file
+    with open("password.bin", "wb") as file:
+        for info in infos:
+            pickle.dump(info, file)
+
+def set_password():
+    password1 = getpass("Enter a password for password manager -> ")
+    password2 = getpass("Enter the password again -> ")
+    if password1 != password2:
+        print("[!] Passwords do not match.")
+        exit()
+
     key = hashlib.sha256(password2.encode()).digest()
     try:
-        with open("dump.txt", "w") as file:
-            file.write(str(key))
-            print("[+] Password Saved!")
-    except Exception as e:
-        print(f"Error: {e}")
+        with open("dump.bin", "wb") as file:
+            pickle.dump(key, file)
+        print("[+] Password Created")
+    except:
+        print("[!] Error occurred during creating a password saving file!")
 
 def check_password(password):
-    with open("dump.txt") as file:
-        byte_key = file.read()[2:-1]
-        byte_key = bytes(eval(f'b"{byte_key}"'))
-
-    key = hashlib.sha256(password.encode()).digest()
-    return byte_key == key
+    try:
+        with open("dump.bin", "rb") as file:
+            key = pickle.load(file)
+        return hashlib.sha256(password.encode()).digest() == key
+    except FileNotFoundError:
+        return False
 
 def menu(key):
     key = hashlib.sha256(key.encode()).digest()
-    print(f"{'*' * 25} PassWord Manager {'*' * 25}")
-    print(f"   1> Show Passwords ")
-    print(f"   2> Store New Password ")
-    print(f"   3> Delete a Record ")
-    print(f"  99> Exit ")
-    choice = int(input("-> "))
-    if choice == 1:
-        show(key)
-    elif choice == 2:
-        store(key)
-    elif choice == 3:
-        delete(key)
-    else:
-        exit()
+    print("1. Show Passwords")
+    print("2. Save New Passwords")
+    print("3. Delete Passwords")
+    print("99. Exit")
+    choice = int(input("Enter choice -> "))
+
+    match choice:
+        case 1:
+            show(key)
+        case 2:
+            store(key)
+        case 3:
+            delete(key)
+        case 99:
+            exit()
+        case _:
+            print("[!] Enter a valid choice")
 
 if __name__ == "__main__":
-    if not os.path.exists("dump.txt"):
-        first_time()
+    if not os.path.exists("dump.bin"):
+        set_password()
         exit()
-    
     for _ in range(5):
-        password = getpass("Enter Passcode: ")
+        password = getpass("Enter your password -> ")
         if check_password(password):
             menu(password)
             break
         else:
-            print(f"Invalid password you have {5 - (_+1)} tries left.")
-
+            print(f"[!] You have {5 - (_ + 1)} tries left.")
