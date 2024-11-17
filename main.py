@@ -103,6 +103,43 @@ def delete(key):
         for info in infos:
             pickle.dump(info, file)
 
+def edit(key):
+        try:
+                with open("password.bin" , "rb") as file:
+                        infos =[]
+                        while True:
+                                try:
+                                        infos.append(pickle.load(file))
+                                except EOFError:
+                                        break
+        except FileNotFoundError:
+                print("[!] No Passwords were Saved before ")
+                exit()
+
+        username = input("Enter the username -> ")
+        password = input("Enter the password -> ")
+
+        for i in range(len(infos)):
+                for j in range(len(infos[i])):
+                        infos[i][j] = decrypt(key, infos[i][j])
+
+        for i in range(len(infos)):
+                if username in infos[i] and password in infos[i]:
+                        print("[*] Record Found ")
+                        infos[i][0] = input("Enter the new url (keep empty not to change) -> ") or infos[i][0]
+                        infos[i][1] = input("Enter the new username (keep empty not to change) -> ") or infos[i][1]
+                        infos[i][2] = input("Enter the new password (keep empty not to change) -> ") or infos[i][2]
+                        infos[i][3] = input("Enter the extra info -> ") or infos[i][3]
+
+        for i in range(len(infos)):
+                for j in range(len(infos[i])):
+                        infos[i][j] = encrypt(key, infos[i][j])
+
+        with open("password.bin" , "wb") as file:
+                for info in infos:
+                        pickle.dump(info,file)
+        print("[*] Edit Sucessful")
+
 def set_password():
     password1 = getpass("Enter a password for password manager -> ")
     password2 = getpass("Enter the password again -> ")
@@ -131,6 +168,7 @@ def menu(key):
     print("1. Show Passwords")
     print("2. Save New Passwords")
     print("3. Delete Passwords")
+    print("4. Edit Passwords")
     print("99. Exit")
     choice = int(input("Enter choice -> "))
 
@@ -141,6 +179,8 @@ def menu(key):
             store(key)
         case 3:
             delete(key)
+        case 4:
+            edit(key)
         case 99:
             exit()
         case _:
