@@ -1,199 +1,83 @@
 #!/usr/bin/env python3
 
 import base64
-import pickle
+import os
+import argparse
+import hashlib
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
-import hashlib
-import os
-from getpass import getpass
-import random
+from Crypto.Random import get_random_bytes
 
 def encrypt(key, text):
-    cipher = AES.new(key, AES.MODE_ECB)
-    padded_text = pad(text.encode(), AES.block_size)
+    iv = get_random_bytes(AES.block_size)
+    cipher = AES.new(key,AES.MODE_CBC , iv)
+    padded_text = pad(text, AES.block_size)
     encryption = base64.b64encode(cipher.encrypt(padded_text))
-    return encryption.decode()
+    return encryption, iv
 
-def decrypt(key, encrypted_text):
-    cipher = AES.new(key, AES.MODE_ECB)
-    decrypted = cipher.decrypt(base64.b64decode(encrypted_text.encode()))
-    decrypted_text = unpad(decrypted, AES.block_size).decode()
-    return decrypted_text
-
-def create_password():
-    # Creating a more diverse set of characters
-    chars = [chr(i) for i in range(65, 91)] + [chr(i) for i in range(97, 123)] + ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "_", "-", "="] + [str(i) for i in range(10)]
-    password = "".join(random.choices(chars, k=20))
-    print(f"Password created is -> {password}")
-    return password
-
-def store(key):
-    url = input("Enter the URL (optional) -> ") or "uu"
-    username = input("Enter the USERNAME -> ")
-    password = input("Enter the PASSWORD -> ") or create_password()
-    field = input("Enter optional text -> ") or "ff"
-
-    info = [url, username, password, field]
-    for i in range(len(info)):
-        info[i] = encrypt(key, info[i])
-
-    # Store the encrypted data
-    with open("password.bin", "ab") as file:
-        pickle.dump(info, file)
-    print("[+] Record Saved!")
-
-def show(key):
+def decrypt(key, encrypted_text, iv):
     try:
-        with open("password.bin", "rb") as file:
-            while True:
-                try:
-                    info = pickle.load(file)
-                    for i in range(len(info)):
-                        info[i] = decrypt(key, info[i])
-
-                    info[0] = " " if info[0] == "uu" else info[0]
-                    print(f"URL => {info[0]}")
-                    print(f"USERNAME => {info[1]}")
-                    print(f"PASSWORD => {info[2]}")
-                    info[3] = " " if info[3] == "ff" else info[3]
-                    print(f"EXTRA INFO => {info[3]}")
-                    print("-" * 40)
-                except EOFError:
-                    break
-    except FileNotFoundError:
-        print("[!] No Passwords were Saved before ")
+        cipher = AES.new(key , AES.MODE_CBC , iv)
+        decrypted = cipher.decrypt(base64.b64decode(encrypted_text))
+        decrypted_text = unpad(decrypted, AES.block_size)
+        return decrypted_text
+    except :
+        print("Wrong Password")
         exit()
 
-def delete(key):
-    try:
-        with open("password.bin", "rb") as file:
-            infos = []
-            while True:
-                try:
-                    infos.append(pickle.load(file))
-                except EOFError:
-                    break
-    except FileNotFoundError:
-        print("[!] No Passwords were Saved before ")
-        exit()
+def traverse(drive):
+    req_files = []
+    for root,_,files in os.walk(drive):
+        for file_name in files:
+            file_path = os.path.join(root, file_name)
+            req_files.append(file_path)
+    return req_files
 
-    username = input("Enter the username -> ")
-    password = input("Enter the password -> ")
+def encryptor(file , key):
+    with open(file , "rb") as f:
+        file_contents = f.read()
 
-    for i in range(len(infos)):
-        for j in range(len(infos[i])):
-            infos[i][j] = decrypt(key, infos[i][j])
+    encrypted_file_contents, iv = encrypt(key , file_contents)
 
-    for i in range(len(infos)):
-        if username in infos[i] and password in infos[i]:
-            print("[*] Record Found")
-            choice = input("Do you want to delete? (y/N) -> ")
-            if choice.lower() != "n":
-                del infos[i]
-                print("[*] Record Deleted")
-            else:
-                print("[*] Record Not Deleted")
-            break
-    else:
-        print("[!] No Record Found!")
+    with open(file , "wb") as f:
+        f.write(iv + encrypted_file_contents)
 
-    # Write the remaining records back to the file
-    with open("password.bin", "wb") as file:
-        for info in infos:
-            pickle.dump(info, file)
+def decryptor(file , key):
+    with open(file , "rb") as f:
+        file_contents = f.read()
+    iv = file_contents[:AES.block_size]
+    file_contents = file_contents[AES.block_size:]
+    decrypted_contents = decrypt(key, file_contents, iv)
 
-def edit(key):
-        try:
-                with open("password.bin" , "rb") as file:
-                        infos =[]
-                        while True:
-                                try:
-                                        infos.append(pickle.load(file))
-                                except EOFError:
-                                        break
-        except FileNotFoundError:
-                print("[!] No Passwords were Saved before ")
-                exit()
+    with open(file , "wb") as f:
+        f.write(decrypted_contents)
 
-        username = input("Enter the username -> ")
-        password = input("Enter the password -> ")
+def main():
+    parser = argparse.ArgumentParser(description=" *** Script To Encrypt Or Decrypt a Drive ***")
+    parser.add_argument("--encrypt", type=str , help="Encrypts the drive")
+    parser.add_argument("--decrypt" , type=str ,help="Decrypts the drive")
+    parser.add_argument("-p", "--password", type=str , required=True , help="Password")
+    args = parser.parse_args()
+    
+    if args.encrypt and args.decrypt:
+        print("Cannot Encrypt and Decrypt same time")
+        exit(1)
 
-        for i in range(len(infos)):
-                for j in range(len(infos[i])):
-                        infos[i][j] = decrypt(key, infos[i][j])
+    password = args.password
+    key = hashlib.sha256(password.encode()).digest()
+    if not os.path.exists(args.encrypt or args.decrypt):
+        print("Path Doesnt Exists")
+        exit(1)
 
-        for i in range(len(infos)):
-                if username in infos[i] and password in infos[i]:
-                        print("[*] Record Found ")
-                        infos[i][0] = input("Enter the new url (keep empty not to change) -> ") or infos[i][0]
-                        infos[i][1] = input("Enter the new username (keep empty not to change) -> ") or infos[i][1]
-                        infos[i][2] = input("Enter the new password (keep empty not to change) -> ") or infos[i][2]
-                        infos[i][3] = input("Enter the extra info -> ") or infos[i][3]
-
-        for i in range(len(infos)):
-                for j in range(len(infos[i])):
-                        infos[i][j] = encrypt(key, infos[i][j])
-
-        with open("password.bin" , "wb") as file:
-                for info in infos:
-                        pickle.dump(info,file)
-        print("[*] Edit Sucessful")
-
-def set_password():
-    password1 = getpass("Enter a password for password manager -> ")
-    password2 = getpass("Enter the password again -> ")
-    if password1 != password2:
-        print("[!] Passwords do not match.")
-        exit()
-
-    key = hashlib.sha256(password2.encode()).digest()
-    try:
-        with open("dump.bin", "wb") as file:
-            pickle.dump(key, file)
-        print("[+] Password Created")
-    except:
-        print("[!] Error occurred during creating a password saving file!")
-
-def check_password(password):
-    try:
-        with open("dump.bin", "rb") as file:
-            key = pickle.load(file)
-        return hashlib.sha256(password.encode()).digest() == key
-    except FileNotFoundError:
-        return False
-
-def menu(key):
-    key = hashlib.sha256(key.encode()).digest()
-    print("1. Show Passwords")
-    print("2. Save New Passwords")
-    print("3. Delete Passwords")
-    print("4. Edit Passwords")
-    print("99. Exit")
-    choice = int(input("Enter choice -> "))
-
-    match choice:
-        case 1:
-            show(key)
-        case 2:
-            store(key)
-        case 3:
-            delete(key)
-        case 4:
-            edit(key)
-        case 99:
-            exit()
-        case _:
-            print("[!] Enter a valid choice")
+    files_found = traverse(args.encrypt or args.decrypt)
+    if args.encrypt:
+        for file in files_found:
+            encryptor(file , key)
+            print(f"Encrypted -> {file}")
+    if args.decrypt:
+        for file in files_found:
+            decryptor(file, key)
+            print(f"Decrypted -> {file}")
 
 if __name__ == "__main__":
-    if not os.path.exists("dump.bin"):
-        set_password()
-        exit()
-    for _ in range(5):
-        password = getpass("Enter your password -> ")
-        if check_password(password):
-            menu(password)
-            break
-        else:
-            print(f"[!] You have {5 - (_ + 1)} tries left.")
+    main()
