@@ -2,12 +2,24 @@
 
 import base64
 import pickle
+import bcrypt
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import hashlib
 import os
 from getpass import getpass
 import random
+
+def hash_password(password):
+    salt = bcrypt.gensalt()
+    hashed_password = bcrypt.hashpw(password.encode(), salt)
+    return hashed_password
+
+def check_password_hash(password, password_hash):
+    try:
+        return bcrypt.checkpw(password.encode(), password_hash)
+    except:
+        return False
 
 def encrypt(key, text):
     cipher = AES.new(key, AES.MODE_ECB)
@@ -35,8 +47,8 @@ def store(key):
     field = input("Enter optional text -> ") or "ff"
 
     info = [url, username, password, field]
-    for i in range(len(info)):
-        info[i] = encrypt(key, info[i])
+    for i, j in enumerate(info):
+        info[i] = encrypt(key, j)
 
     # Store the encrypted data
     with open("/usr/bin/password.bin", "ab") as file:
@@ -44,26 +56,38 @@ def store(key):
     print("[+] Record Saved!")
 
 def show(key):
+    choice = input("Enter the url or username => ") or None
+
+    if not choice or choice == "":
+                    print("Enter Something.\nExitting...")
+                    exit()
+
+    flag = -1
     try:
         with open("/usr/bin/password.bin", "rb") as file:
             while True:
                 try:
                     info = pickle.load(file)
-                    for i in range(len(info)):
-                        info[i] = decrypt(key, info[i])
-
-                    info[0] = " " if info[0] == "uu" else info[0]
-                    print(f"URL => {info[0]}")
-                    print(f"USERNAME => {info[1]}")
-                    print(f"PASSWORD => {info[2]}")
-                    info[3] = " " if info[3] == "ff" else info[3]
-                    print(f"EXTRA INFO => {info[3]}")
-                    print("-" * 40)
+                    for i, j in enumerate(info):
+                        info[i] = decrypt(key, j)
+                    
+                    if choice in info[0] or choice in info[1]:
+                        if info[0] != "uu":
+                            print(f"URL => {info[0]}")
+                        print(f"USERNAME => {info[1]}")
+                        print(f"PASSWORD => {info[2]}")
+                        if info[3] != "ff":
+                            print("EXTRA INFO => {info[3]}")
+                        print("-" * 40)
+                        flag = 1
                 except EOFError:
                     break
     except FileNotFoundError:
         print("[!] No Passwords were Saved before ")
         exit()
+    finally:
+        if flag == -1 :
+            print("No Passwords was found.\n")
 
 def delete(key):
     try:
@@ -148,24 +172,25 @@ def set_password():
         print("[!] Passwords do not match.")
         exit()
 
-    key = hashlib.sha256(password2.encode()).digest()
+    key = hash_password(password1)
     try:
         with open("/usr/bin/dump.bin", "wb") as file:
             pickle.dump(key, file)
         print("[+] Password Created")
-    except:
-        print("[!] Error occurred during creating a password saving file!")
+    except Exception as e:
+        print("[!] Error occurred during creating a password saving file!\n", e)
 
 def check_password(password):
     try:
         with open("/usr/bin/dump.bin", "rb") as file:
             key = pickle.load(file)
-        return hashlib.sha256(password.encode()).digest() == key
+        return check_password_hash(password, key)
     except FileNotFoundError:
         return False
 
 def menu(key):
     key = hashlib.sha256(key.encode()).digest()
+
     print("1. Show Passwords")
     print("2. Save New Passwords")
     print("3. Delete Passwords")
@@ -191,10 +216,11 @@ if __name__ == "__main__":
     if not os.path.exists("/usr/bin/dump.bin"):
         set_password()
         exit()
-    for _ in range(5):
+
+    for x in range(5):
         password = getpass("Enter your password -> ")
         if check_password(password):
             menu(password)
             break
         else:
-            print(f"[!] You have {5 - (_ + 1)} tries left.")
+            print(f"[!] You have {5 - (x + 1)} tries left.")
