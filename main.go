@@ -8,13 +8,17 @@ import (
 	"math/rand"
 	"module/mymodule"
 	"os"
+	"strings"
+	"syscall"
+
+	"golang.org/x/term"
 )
 
 const (
-	PATH         = "pass"             // Folder name
-	DUMPFILE     = "pass/dump.bin"    // login password file
-	PASSWORDFILE = "pass/pass.bin"    // password file
-	EXPORTFILE   = "datadump.csv"     // Export file name
+	PATH         = "pass"
+	DUMPFILE     = "pass/dump.bin"
+	PASSWORDFILE = "pass/pass.bin"
+	EXPORTFILE   = "datadump.csv"
 )
 
 type Entries struct {
@@ -89,7 +93,7 @@ func import_passwords(password string) {
 
 	file_contents, err := os.Open(filename)
 	if err != nil {
-		log.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 		return
 	}
 	defer file_contents.Close()
@@ -97,7 +101,7 @@ func import_passwords(password string) {
 	csv_reader := csv.NewReader(file_contents)
 	string_contents, err := csv_reader.ReadAll()
 	if err != nil {
-		log.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 		return
 	}
 
@@ -107,7 +111,7 @@ func import_passwords(password string) {
 	// Load passwords
 	file_content, err := Load()
 	if err != nil {
-		log.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 		return
 	}
 
@@ -124,7 +128,7 @@ func import_passwords(password string) {
 	// Dump
 	err = Dump(file_content)
 	if err != nil {
-		log.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 		return
 	}
 	fmt.Printf("[*] Imported %v Passwords from %v!\n", len(string_contents), filename)
@@ -137,7 +141,7 @@ func export_passwords(password string) {
 	hashed_password := mymodule.Hash256(password)
 	file_contents, err := Load()
 	if err != nil {
-		log.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 	}
 
 	string_contents = append(string_contents, []string{"Site", "Username", "Password", "Note"}) // Header
@@ -148,7 +152,7 @@ func export_passwords(password string) {
 
 	file, err := os.Create(EXPORTFILE)
 	if err != nil {
-		log.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 	}
 
 	w := csv.NewWriter(file)
@@ -164,7 +168,7 @@ func edit_existing_password(password string) {
 	hashed_password := mymodule.Hash256(password)
 	file_contents, err := Load()
 	if err != nil {
-		log.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 		return
 	}
 
@@ -215,7 +219,7 @@ func edit_existing_password(password string) {
 	}
 
 	if err := Dump(file_contents); err != nil {
-		log.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 		return
 	}
 	fmt.Printf("[*] Record Edited!\n")
@@ -230,7 +234,7 @@ func delete_password(password string) {
 	hash_password := mymodule.Hash256(password)
 	file_contents, err := Load()
 	if err != nil {
-		log.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 		return
 	}
 
@@ -264,7 +268,7 @@ func delete_password(password string) {
 	}
 	fmt.Printf("[*] Record Deleted!\n")
 	if err := Dump(new_entry); err != nil {
-		log.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 	}
 
 	if !found {
@@ -418,21 +422,21 @@ func create_database_password() {
 	// Creating the folder
 	err := os.MkdirAll(PATH, 0700)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 		return
 	}
 
 	// Creating the file
 	file, err := os.Create(DUMPFILE)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 		return
 	}
 	defer file.Close()
 
 	_, err = os.Create(PASSWORDFILE)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		log.Printf("[!] Error: %v\n", err)
 		return
 	}
 
@@ -443,20 +447,32 @@ func create_database_password() {
 	fmt.Printf("Password Saved Sucessfully \n")
 }
 
+func get_password_securely() (string, error) {
+	fmt.Printf("Enter Password -> ")
+	byte_password, err := term.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		return "", err
+	}
+	password := string(byte_password)
+	return strings.TrimSpace(password), nil
+}
+
 func main() {
 	if _, err := os.Stat(DUMPFILE); os.IsNotExist(err) {
 		create_database_password()
 		return
 	}
 
-	var password string
 	for i := 0; i < 5; i++ {
-		fmt.Printf("Enter Password: ")
-		fmt.Scanln(&password)
+		password, err := get_password_securely()
+		if err != nil {
+			log.Printf("[!] Error: %v\n", err)
+		}
+
 		if check_password(password) {
 			menu(password)
 			return
 		}
-		fmt.Printf("You Have %v Tries Left\n", 5-(i+1))
+		fmt.Printf("[!] You Have %v Tries Left\n", 5-(i+1))
 	}
 }
