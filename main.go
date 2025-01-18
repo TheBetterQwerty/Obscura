@@ -450,6 +450,7 @@ func create_database_password() {
 func get_password_securely() (string, error) {
 	fmt.Printf("Enter Password -> ")
 	byte_password, err := term.ReadPassword(int(syscall.Stdin))
+	fmt.Printf("\n")
 	if err != nil {
 		return "", err
 	}
