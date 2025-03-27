@@ -15,10 +15,10 @@ import (
 )
 
 const (
-        PATH         = "hello"
-        DUMPFILE     = "hello/dump.bin"
-        PASSWORDFILE = "hello/pass.bin"
-        EXPORTFILE   = "datadump.csv"
+        PATH         = "/home/qwerty/.passmanager"
+        DUMPFILE     = "/home/qwerty/.passmanager/dump.bin"
+        PASSWORDFILE = "/home/qwerty/.passmanager/pass.bin"
+        EXPORTFILE   = "/home/qwerty/Desktop/datadump.csv"
 )
 
 type Entries struct {
@@ -67,7 +67,7 @@ func contains(str string, substr string) bool {
         for i := 0; i <= len(str)-len(substr); i++ {
                 var cnt int = 0
                 for j := 0; j < len(substr); j++ {
-                        if str[i+j] != substr[j] {
+                        if strings.ToUpper(string(str[i+j])) != strings.ToUpper(string(substr[j])) {
                                 break
                         }
                         cnt++
@@ -340,26 +340,26 @@ func view_saved_passwords(password string) {
 
         var search string
         flag := -1
-        fmt.Printf("[?] Enter the site or the username -> ")
+        fmt.Printf("| [?] Enter the site or the username -> ")
         fmt.Scanln(&search)
 
         for _, content := range new_contents {
                 if contains(content.Site, search) || contains(content.Username, search) {
-                        fmt.Printf("-------------------------------------------------\n")
-                        fmt.Printf("Site :      %v\n", content.Site)
-                        fmt.Printf("Username :  %v\n", content.Username)
-                        fmt.Printf("Password :  %v\n", content.Password)
+                        fmt.Printf("+-------------------------------------------------+\n")
+                        fmt.Printf("| Site :      %v\n", content.Site)
+                        fmt.Printf("| Username :  %v\n", content.Username)
+                        fmt.Printf("| Password :  %v\n", content.Password)
                         if content.Note != "" {
-                                fmt.Printf("Note :      %v\n", content.Note)
+                                fmt.Printf("| Note :      %v\n", content.Note)
                         }
                         flag++
                 }
         }
         if flag == -1 {
-                fmt.Printf("[!] No Record Was Found!\n")
+                fmt.Printf("| [!] No Record Was Found!\n")
                 return
         }
-        fmt.Printf("-------------------------------------------------\n")
+        fmt.Printf("+-------------------------------------------------+\n")
 }
 
 func add_new_passwords(password string) {
@@ -450,16 +450,21 @@ func change_password() {
 
 func menu(password string) {
         var choice int
-        fmt.Printf("1. View Saved Passwords\n")
-        fmt.Printf("2. Add New Passwords\n")
-        fmt.Printf("3. Generate Passwords\n")
-        fmt.Printf("4. Delete Password\n")
-        fmt.Printf("5. Edit Existing Password\n")
-        fmt.Printf("6. Import Password From File\n")
-        fmt.Printf("7. Export Passwords\n")
-        fmt.Printf("8. Change Password\n")
-        fmt.Printf("9. Exit Password Manager\n")
-        fmt.Printf("[?] Enter Choice: ")
+        fmt.Println("+---------------------------------+")
+        fmt.Println("|      Password Manager Menu      |")
+        fmt.Println("+---------------------------------+")
+        fmt.Println("| 1. View Saved Passwords         |")
+        fmt.Println("| 2. Add New Password             |")
+        fmt.Println("| 3. Generate Password            |")
+        fmt.Println("| 4. Delete Password              |")
+        fmt.Println("| 5. Edit Existing Password       |")
+        fmt.Println("| 6. Import Password From File    |")
+        fmt.Println("| 7. Export Passwords             |")
+        fmt.Println("| 8. Change Password              |")
+        fmt.Println("| 9. Exit Password Manager        |")
+        fmt.Println("+---------------------------------+")
+
+        fmt.Print("| [?] Enter Choice: ")
         fmt.Scanln(&choice)
 
         switch choice {
@@ -468,7 +473,7 @@ func menu(password string) {
         case 2:
                 add_new_passwords(password)
         case 3:
-                fmt.Printf("Generated random password -> %v\n", generate_random_password())
+                fmt.Printf("[+] Generated random password -> %v\n", generate_random_password())
         case 4:
                 delete_password(password)
         case 5:
